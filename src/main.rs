@@ -1,4 +1,8 @@
-use clap::{arg, error, Command};
+use clap::{
+    arg,
+    error::{self, Error},
+    Command,
+};
 use flate2;
 use std::{
     fs, io,
@@ -15,7 +19,7 @@ fn cli() -> Command {
         .subcommand(
             Command::new("init")
                 .about("init a repository")
-                .arg(arg!(<DIRECTORY> "The directory in which to initialize the repo")),
+                .arg(arg!([DIRECTORY] "The directory in which to initialize the repo")),
         )
 }
 
@@ -24,12 +28,26 @@ fn main() {
 
     match matches.subcommand() {
         Some(("init", sub_matches)) => {
-            create_repo(sub_matches.get_one::<String>("DIRECTORY").expect("."));
+            let _ = create_repo(
+                sub_matches
+                    .get_one::<String>("DIRECTORY")
+                    .unwrap_or(&".".to_string()),
+            );
         }
         _ => unreachable!(),
     }
 }
 
-fn create_repo(directory: String) {
-    todo!("oui");
+fn create_repo(directory: &str) -> io::Result<()> {
+    match directory {
+        "." => {
+            // init the repo in the pwd
+            println!("init pwd");
+        }
+        _ => {
+            //init the repo in the specified directory
+            println!("init in {}", directory);
+        }
+    }
+    Ok(())
 }
