@@ -1,0 +1,8 @@
+[package]
+name = "git-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = "4.5.7"
+flate2 = "1.0.30"
