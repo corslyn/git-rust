@@ -1,69 +1,110 @@
-use clap::{arg, builder::Str, ArgGroup, Command};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use flate2::read::ZlibDecoder;
 use std::{
     fs, io,
     io::Read,
-    path::{self, Path, PathBuf},
+    path::{Path, PathBuf},
 };
 
-fn cli() -> Command {
-    Command::new("git-rust")
-        .about("git remade in Rust")
-        .author("corslyn")
-        .subcommand_required(true)
-        .arg_required_else_help(true)
-        .allow_external_subcommands(true)
-        .subcommand(
-            Command::new("init")
-                .about("Create an empty Git repository")
-                .arg(arg!(<DIRECTORY> "The directory in which to initialize the repo")),
-        )
-        .subcommand(
-            Command::new("cat-file")
-                .about("Provide contents or details of repository objects")
-                .arg(
-                    arg!(<TYPE> "The type of the object")
-                        .value_parser(["blob", "commit", "tag", "tree"]),
-                )
-                .arg(arg!(<OBJECT> "The object to display")),
-        )
-        .subcommand(
-            Command::new("hash-object")
-                .about("Compute object ID and optionally create an object from a file")
-                .arg(
-                    arg!(-t --type <TYPE> "object type")
-                        .value_parser(["blob", "commit", "tag", "tree"]),
-                )
-                .arg(arg!(-w --write "write the object into the object database"))
-                .arg(arg!(<PATH> "Read object from <file>")),
-        )
+// fn cli() -> Command {
+//     Command::new("git-rust")
+//         .about("git remade in Rust")
+//         .author("corslyn")
+//         .subcommand_required(true)
+//         .arg_required_else_help(true)
+//         .allow_external_subcommands(true)
+//         .subcommand(
+//             Command::new("init")
+//                 .about("Create an empty Git repository")
+//                 .arg(arg!(<DIRECTORY> "The directory in which to initialize the repo")),
+//         )
+//         .subcommand(
+//             Command::new("cat-file")
+//                 .about("Provide contents or details of repository objects")
+//                 .arg(
+//                     arg!(<TYPE> "The type of the object")
+//                         .value_parser(["blob", "commit", "tag", "tree"]),
+//                 )
+//                 .arg(arg!(<OBJECT> "The object to display")),
+//         )
+//         .subcommand(
+//             Command::new("hash-object")
+//                 .about("Compute object ID and optionally create an object from a file")
+//                 .arg(
+//                     arg!(-t --type <TYPE> "object type")
+//                         .value_parser(["blob", "commit", "tag", "tree"]),
+//                 )
+//                 .arg(arg!(-w --write "write the object into the object database"))
+//                 .arg(arg!(<PATH> "Read object from <file>")),
+//         )
+// }
+
+#[derive(Debug, Parser)]
+#[command(name = "git-rust")]
+#[command(about = "git remade in Rust")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
 }
 
-fn main() {
-    let matches = cli().get_matches();
+#[derive(Debug, Subcommand)]
+enum Commands {
+    /// Create an empty Git repository
+    Init {
+        /// The directory in which to initialize the repo
+        directory: Option<String>,
+    },
 
-    match matches.subcommand() {
-        Some(("init", sub_matches)) => {
-            let _ = create_repo(
-                sub_matches
-                    .get_one::<String>("DIRECTORY")
-                    .unwrap_or(&".".to_string()),
-            );
+    /// Provide contents or details of repository objects
+    #[command(arg_required_else_help = true)]
+    #[command(name = "cat-file")]
+    CatFile {
+        /// object type
+        r#type: Objects,
+
+        /// The object to display
+        hash: String,
+    },
+
+    /// Compute object ID and optionally create an object from a file
+    #[command(arg_required_else_help = true)]
+    #[command(name = "hash-object")]
+    HashObject {
+        /// object type
+        r#type: Objects,
+
+        /// read object from file
+        file: Option<String>,
+    },
+}
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum Objects {
+    Blob,
+    Commit,
+    Tag,
+    Tree,
+}
+fn main() {
+    let args = Cli::parse();
+
+    match args.command {
+        Commands::Init { directory } => {
+            create_repo(directory);
         }
-        Some(("cat-file", sub_matches)) => {
-            // let object_type = sub_matches.get_one::<String>("TYPE").expect("required");
-            let object = sub_matches.get_one::<String>("OBJECT").expect("required");
-            cat_file(object);
+
+        Commands::CatFile { r#type, hash } => {
+            cat_file(&hash);
         }
-        Some(("hash-object", sub_matches)) => {
+
+        Commands::HashObject { r#type, file } => {
             todo!("Implement hash-object")
         }
-        _ => unreachable!(),
     }
 }
 
-fn create_repo(directory: &str) -> io::Result<()> {
-    let path = Path::new(directory);
+fn create_repo(directory: Option<String>) -> io::Result<()> {
+    let dir = directory.unwrap_or(".".to_string());
+    let path = Path::new(&dir);
     let absolute_path = fs::canonicalize(path)?;
     if !path.exists() {
         fs::create_dir_all(path)?;
